@@ -20,15 +20,6 @@ export default function AboutPage() {
         <header className='border-b border-slate-800/50 bg-slate-900/20 backdrop-blur-sm'>
           <div className='container mx-auto px-4 py-4'>
             <div className='flex items-center gap-4'>
-              <Link href='/'>
-                <Button
-                  variant='outline'
-                  size='icon'
-                  className='border-slate-600 hover:bg-slate-700 bg-slate-800/50'
-                >
-                  <ArrowLeft className='h-4 w-4' />
-                </Button>
-              </Link>
               <div className='flex items-center gap-3'>
                 <motion.div
                   className='text-3xl'
@@ -37,9 +28,12 @@ export default function AboutPage() {
                 >
                   ⌨️
                 </motion.div>
-                <h1 className='text-2xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent'>
-                  About Spacebar Clicker
-                </h1>
+                <Link
+                  href='/'
+                  className='text-2xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent'
+                >
+                  Spacebar Clicker
+                </Link>
               </div>
             </div>
           </div>
@@ -55,9 +49,9 @@ export default function AboutPage() {
               transition={{ duration: 0.6 }}
               className='text-center space-y-6'
             >
-              <h2 className='text-4xl font-bold text-white mb-4'>
-                The Ultimate Clicking Experience
-              </h2>
+              <h1 className='text-4xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent'>
+                About Spacebar Clicker
+              </h1>
               <p className='text-xl text-slate-300 max-w-2xl mx-auto'>
                 Spacebar Clicker is more than just a game - it's a test of
                 speed, endurance, and determination. Challenge yourself, unlock

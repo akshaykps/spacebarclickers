@@ -19,22 +19,20 @@ export default function PrivacyPolicyPage() {
         {/* Header */}
         <header className='border-b border-slate-800/50 bg-slate-900/20 backdrop-blur-sm'>
           <div className='container mx-auto px-4 py-4'>
-            <div className='flex items-center gap-4'>
-              <Link href='/'>
-                <Button
-                  variant='outline'
-                  size='icon'
-                  className='border-slate-600 hover:bg-slate-700 bg-slate-800/50'
-                >
-                  <ArrowLeft className='h-4 w-4' />
-                </Button>
+            <div className='flex items-center gap-3'>
+              <motion.div
+                className='text-3xl'
+                animate={{ rotate: [0, 10, -10, 0] }}
+                transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
+              >
+                ⌨️
+              </motion.div>
+              <Link
+                href='/'
+                className='text-2xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent'
+              >
+                Spacebar Clicker
               </Link>
-              <div className='flex items-center gap-3'>
-                <Shield className='h-6 w-6 text-green-400' />
-                <h1 className='text-2xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent'>
-                  Privacy Policy
-                </h1>
-              </div>
             </div>
           </div>
         </header>
@@ -48,9 +46,9 @@ export default function PrivacyPolicyPage() {
               transition={{ duration: 0.6 }}
               className='text-center'
             >
-              <h2 className='text-3xl font-bold text-white mb-4'>
-                Your Privacy Matters
-              </h2>
+              <h1 className='text-4xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent'>
+                Privacy Policy
+              </h1>
               <p className='text-xl text-slate-300'>
                 Last updated: December 2024
               </p>

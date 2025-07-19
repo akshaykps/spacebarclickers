@@ -22,6 +22,9 @@ import {
   Home,
   Play,
   Check,
+  LogIn,
+  LogOut,
+  UserCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -49,8 +52,13 @@ import {
   api,
   type BackendAchievement,
   type LeaderboardEntry as BackendLeaderboardEntry,
-} from '@/lib/api-service' // Updated import path
-import Footer from '@/components/footer'
+  getUserCountry, // Import getUserCountry
+  type User as BackendUser, // Import User type from api.ts
+} from '@/lib/api'
+import Link from 'next/link' // Import Link for navigation
+import { useRouter } from 'next/navigation' // Import useRouter for navigation
+import Footer from '@/components/footer' // Import the new Footer component
+import HowItWorksSection from '@/components/how-it-works-section' // Import the new HowItWorksSection
 
 interface Achievement {
   id: number
@@ -111,7 +119,10 @@ interface LeaderboardEntry {
   isVerified?: boolean
 }
 
-const predefinedAchievements: Omit<Achievement, 'unlocked' | 'activated'>[] = [
+export const predefinedAchievements: Omit<
+  Achievement,
+  'unlocked' | 'activated'
+>[] = [
   {
     id: 1,
     name: 'First Steps',
@@ -484,7 +495,10 @@ export default function SpacebarClickerGame() {
     background: 'slate-950',
     bgClass: 'bg-slate-950',
   })
-  const [username, setUsername] = useState('')
+  const [currentUser, setCurrentUser] = useState<BackendUser | null>(null) // New state for logged-in user
+  const [anonymousUsername, setAnonymousUsername] = useState<string | null>(
+    null
+  ) // New state for anonymous user
   const [showSettings, setShowSettings] = useState(false)
   const [gameStats, setGameStats] = useState<GameStats>({
     totalClicks: 0,
@@ -505,91 +519,349 @@ export default function SpacebarClickerGame() {
     BackendLeaderboardEntry[]
   >([])
   const [leaderboardLoading, setLeaderboardLoading] = useState(true)
+  const [userCountryInfo, setUserCountryInfo] = useState({
+    country: 'Unknown',
+    country_code: 'XX',
+    flag_emoji: '🌍',
+  })
+  const [scoreAlert, setScoreAlert] = useState<{
+    message: string
+    type: 'success' | 'info' | 'error'
+  } | null>(null)
+  const [highScoreData, setHighScoreData] = useState<{
+    high_score: number
+    holder: string | null
+    country: string
+    flag_emoji: string
+    is_verified: boolean
+  } | null>(null) // New state for global high score
 
   const gameAreaRef = useRef<HTMLDivElement>(null)
   const autoClickerRef = useRef<NodeJS.Timeout[]>([])
   const statsIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const scoreSubmitDebounceRef = useRef<NodeJS.Timeout | null>(null) // Ref for debounced score submission
   const clickCountRef = useRef(0)
   const startTimeRef = useRef(Date.now())
   const confettiIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const router = useRouter() // Initialize useRouter
 
-  // Initialize game
+  // Create an Audio object for the click sound
+  const clickSoundRef = useRef<HTMLAudioElement | null>(null)
+  useEffect(() => {
+    clickSoundRef.current = new Audio('/sounds/click.mp3')
+    clickSoundRef.current.volume = 0.5 // Set a default volume
+    clickSoundRef.current.load() // Preload the audio
+  }, [])
+
+  // Function to play the click sound
+  const playClickSound = useCallback(() => {
+    if (soundEnabled && clickSoundRef.current) {
+      // Only play if the audio is ready
+      if (clickSoundRef.current.readyState >= 2) {
+        clickSoundRef.current.currentTime = 0 // Reset to start for rapid clicks
+        clickSoundRef.current
+          .play()
+          .catch((e) => console.error('Error playing sound:', e))
+      } else {
+        console.warn('Click sound not ready to play.')
+      }
+    }
+  }, [soundEnabled])
+
+  // Fetch and refresh leaderboard
+  const fetchLeaderboard = useCallback(async () => {
+    try {
+      const response = await api.getLeaderboard()
+      if (response.success && response.data) {
+        setLeaderboardData(response.data.leaderboard)
+        console.log(
+          'Leaderboard data updated in state:',
+          response.data.leaderboard
+        ) // Added log
+      } else {
+        console.error('Failed to load leaderboard data:', response.error)
+      }
+    } catch (error) {
+      console.error('Failed to fetch leaderboard:', error)
+    } finally {
+      setLeaderboardLoading(false)
+    }
+  }, [])
+
+  // Fetch and refresh global high score
+  const fetchHighScore = useCallback(async () => {
+    try {
+      const response = await api.getHighScore()
+      if (response.success && response.data) {
+        setHighScoreData(response.data)
+        console.log('High score data updated:', response.data)
+      } else {
+        console.error('Failed to load high score data:', response.error)
+      }
+    } catch (error) {
+      console.error('Failed to fetch high score:', error)
+    }
+  }, [])
+
+  const submitGameScore = useCallback(async () => {
+    const usernameToSubmit =
+      currentUser?.username || anonymousUsername || 'AnonymousGuest' // Use logged-in username or generated anonymous username
+    if (totalClicks === 0) {
+      console.log('Skipping score submission: no clicks.')
+      return
+    }
+
+    // Extract unlocked and activated achievement IDs
+    const achievements_unlocked_ids = achievements
+      .filter((a) => a.unlocked)
+      .map((a) => a.id)
+    const achievements_activated_ids = achievements
+      .filter((a) => a.activated)
+      .map((a) => a.id)
+
+    const scoreData = {
+      username: usernameToSubmit,
+      total_clicks: totalClicks,
+      clicks_per_second: gameStats.clicksPerSecond,
+      achievements_unlocked: gameStats.achievementsUnlocked,
+      achievements_activated: gameStats.achievementsActivated,
+      time_played_seconds: gameStats.timePlayedSeconds,
+      country: userCountryInfo.country,
+      country_code: userCountryInfo.country_code,
+      flag_emoji: userCountryInfo.flag_emoji,
+      // Add the new fields for backend submission
+      achievements_unlocked_ids,
+      achievements_activated_ids,
+    }
+
+    console.log('Attempting to submit score:', scoreData) // Added log
+
+    try {
+      const response = await api.submitScore(scoreData)
+      if (response.success) {
+        console.log('Score submitted successfully:', response.data)
+        if (response.data?.is_new_record) {
+          setScoreAlert({
+            message: "🎉 New High Score! You're on the leaderboard!",
+            type: 'success',
+          })
+        } else if (response.data?.score_improved) {
+          setScoreAlert({
+            message: '📈 Score Improved! Keep climbing!',
+            type: 'info',
+          })
+        }
+        fetchLeaderboard() // Refresh leaderboard immediately after submission
+        fetchHighScore() // Refresh high score immediately after submission
+      } else {
+        console.error('Failed to submit score:', response.error)
+        setScoreAlert({
+          message: `Failed to submit score: ${response.error}`,
+          type: 'error',
+        })
+      }
+    } catch (error) {
+      console.error('Error submitting score:', error)
+      setScoreAlert({
+        message: `Error submitting score: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+        type: 'error',
+      })
+    }
+  }, [
+    currentUser,
+    anonymousUsername,
+    totalClicks,
+    gameStats,
+    achievements,
+    userCountryInfo,
+    fetchLeaderboard,
+    fetchHighScore,
+  ])
+
+  // Initialize game and load user data
   useEffect(() => {
     const initializeGame = async () => {
       const savedData = localStorage.getItem('spacebar-clicker-data')
-      if (savedData) {
+      let initialTotalClicks = 0
+      let initialClickMultiplier = 1
+      let initialGameStats = { ...gameStats } // Copy default stats
+      let initialSoundEnabled = true
+      let initialCurrentTheme = { ...currentTheme } // Copy default theme
+      let initialAchievements: Achievement[] = []
+
+      try {
+        // Always fetch backend achievements first to get the latest definitions
+        initialAchievements = await initializeAchievements()
+
+        if (savedData) {
+          try {
+            const data = JSON.parse(savedData)
+            initialTotalClicks = data.totalClicks || 0
+            initialClickMultiplier = data.clickMultiplier || 1
+            initialGameStats = data.gameStats || initialGameStats
+            initialSoundEnabled = data.soundEnabled !== false
+            initialCurrentTheme = data.currentTheme || initialCurrentTheme
+
+            // Merge backend achievements with saved user progress
+            initialAchievements = initialAchievements.map((backendAch) => {
+              const savedAch = (data.achievements || []).find(
+                (saved: Achievement) => saved.id === backendAch.id
+              )
+              return {
+                ...backendAch,
+                unlocked: savedAch?.unlocked || false,
+                activated: savedAch?.activated || false,
+              }
+            })
+          } catch (error) {
+            console.error('Failed to parse saved data, starting fresh:', error)
+            // If parsing fails, use default/backend achievements
+          }
+        }
+      } catch (error) {
+        console.error('Error during initial achievement load:', error)
+        // Fallback to predefined if backend fails
+        initialAchievements = getFallbackAchievements()
+      }
+
+      // Fetch user country info
+      const countryInfo = await getUserCountry()
+      setUserCountryInfo(countryInfo)
+
+      // Load current user from localStorage
+      const userDataString = localStorage.getItem('user_data')
+      if (userDataString) {
         try {
-          const data = JSON.parse(savedData)
-          setTotalClicks(data.totalClicks || 0)
-          setClickMultiplier(data.clickMultiplier || 1)
-          setUsername(data.username || '')
-          setGameStats(data.gameStats || gameStats)
-          setSoundEnabled(data.soundEnabled !== false)
-          setCurrentTheme(data.currentTheme || currentTheme)
-          startTimeRef.current =
-            Date.now() - (data.gameStats?.timePlayedSeconds || 0) * 1000
+          const userData = JSON.parse(userDataString)
+          setCurrentUser(userData)
 
-          // Load achievements from backend, but preserve user progress
-          const backendAchievements = await initializeAchievements()
-          const savedAchievements = data.achievements || []
+          // If logged in, fetch user's score from backend and override local state
+          console.log('User logged in, fetching score from backend...')
+          const myScoreResponse = await api.getMyScore()
+          if (myScoreResponse.success && myScoreResponse.data) {
+            const userScore = myScoreResponse.data.entry
+            console.log('Fetched user score:', userScore)
+            setTotalClicks(userScore.total_clicks)
+            setGameStats((prev) => ({
+              ...prev,
+              totalClicks: userScore.total_clicks,
+              clicksPerSecond: userScore.clicks_per_second,
+              timePlayedSeconds: userScore.time_played_seconds,
+              achievementsUnlocked: userScore.achievements_unlocked,
+              achievementsActivated: userScore.achievements_activated,
+            }))
 
-          // Merge backend achievements with saved user progress
-          const mergedAchievements = backendAchievements.map((backendAch) => {
-            const savedAch = savedAchievements.find(
-              (saved: Achievement) => saved.id === backendAch.id
+            // Re-apply activated achievement effects based on fetched data
+            // IMPORTANT: Backend must provide achievements_unlocked_ids and achievements_activated_ids
+            initialAchievements = initialAchievements.map((ach) => {
+              const isUnlocked =
+                userScore.achievements_unlocked_ids?.includes(ach.id) || false
+              const isActivated =
+                userScore.achievements_activated_ids?.includes(ach.id) || false
+              return { ...ach, unlocked: isUnlocked, activated: isActivated }
+            })
+            // Recalculate multiplier based on activated achievements
+            const newMultiplier = initialAchievements
+              .filter((a) => a.activated)
+              .reduce((mult, a) => mult * a.clickMultiplier, 1)
+            setClickMultiplier(newMultiplier)
+          } else {
+            console.warn(
+              'Failed to fetch user score from backend, using local data or defaults.'
             )
-            return {
-              ...backendAch,
-              unlocked: savedAch?.unlocked || false,
-              activated: savedAch?.activated || false,
-            }
-          })
-
-          setAchievements(mergedAchievements)
+            setTotalClicks(initialTotalClicks)
+            setClickMultiplier(initialClickMultiplier)
+            setGameStats(initialGameStats)
+          }
         } catch (error) {
-          console.error('Failed to load saved data:', error)
-          const achievements = await initializeAchievements()
-          setAchievements(achievements)
+          console.error('Failed to parse user data or fetch score:', error)
+          localStorage.removeItem('user_data')
+          localStorage.removeItem('auth_token')
+          setCurrentUser(null)
+          setTotalClicks(initialTotalClicks)
+          setClickMultiplier(initialClickMultiplier)
+          setGameStats(initialGameStats)
         }
       } else {
-        const achievements = await initializeAchievements()
-        setAchievements(achievements)
+        // Not logged in, handle anonymous user
+        let guestUsername = localStorage.getItem('guest_username')
+        if (!guestUsername) {
+          guestUsername = `Guest-${Math.random().toString(36).substring(2, 8)}`
+          localStorage.setItem('guest_username', guestUsername)
+        }
+        setAnonymousUsername(guestUsername)
+        setTotalClicks(initialTotalClicks)
+        setClickMultiplier(initialClickMultiplier)
+        setGameStats(initialGameStats)
       }
+
+      setAchievements(initialAchievements)
+      setSoundEnabled(initialSoundEnabled)
+      setCurrentTheme(initialCurrentTheme)
+      startTimeRef.current =
+        Date.now() - (initialGameStats?.timePlayedSeconds || 0) * 1000
 
       // Start stats tracking
       statsIntervalRef.current = setInterval(updateStats, 1000)
     }
 
     initializeGame()
+    fetchLeaderboard() // Initial fetch of leaderboard
+    fetchHighScore() // Initial fetch of high score
 
     return () => {
       if (statsIntervalRef.current) {
         clearInterval(statsIntervalRef.current)
       }
-    }
-  }, [])
-
-  // Add this useEffect after the existing initialization useEffect
-  useEffect(() => {
-    const fetchLeaderboard = async () => {
-      try {
-        const response = await api.getLeaderboard()
-        if (response.success && response.data) {
-          setLeaderboardData(response.data.leaderboard)
-        }
-      } catch (error) {
-        console.error('Failed to fetch leaderboard:', error)
-      } finally {
-        setLeaderboardLoading(false)
+      if (scoreSubmitDebounceRef.current) {
+        clearTimeout(scoreSubmitDebounceRef.current)
       }
     }
+  }, [fetchLeaderboard, fetchHighScore]) // Added fetchHighScore to dependencies
 
-    fetchLeaderboard()
-
-    // Refresh leaderboard every 30 seconds
+  // Periodic leaderboard refresh (every 30 seconds)
+  useEffect(() => {
     const interval = setInterval(fetchLeaderboard, 30000)
     return () => clearInterval(interval)
-  }, [])
+  }, [fetchLeaderboard])
+
+  // Periodic high score refresh (every 30 seconds)
+  useEffect(() => {
+    const interval = setInterval(fetchHighScore, 30000)
+    return () => clearInterval(interval)
+  }, [fetchHighScore])
+
+  // Debounced score submission on inactivity
+  useEffect(() => {
+    if (scoreSubmitDebounceRef.current) {
+      clearTimeout(scoreSubmitDebounceRef.current)
+    }
+
+    // Set a timeout to submit score after 2 seconds of inactivity
+    scoreSubmitDebounceRef.current = setTimeout(() => {
+      // Submit score for both logged-in and anonymous users if clicks exist
+      if (totalClicks > 0) {
+        console.log('Debounced score submission triggered.') // Added log
+        submitGameScore()
+      }
+    }, 2000) // 2 seconds debounce
+
+    return () => {
+      if (scoreSubmitDebounceRef.current) {
+        clearTimeout(scoreSubmitDebounceRef.current)
+      }
+    }
+  }, [
+    totalClicks,
+    currentUser,
+    anonymousUsername,
+    gameStats,
+    achievements,
+    userCountryInfo,
+    submitGameScore,
+  ]) // Added submitGameScore to dependencies
 
   // Save to localStorage
   useEffect(() => {
@@ -597,7 +869,7 @@ export default function SpacebarClickerGame() {
       totalClicks,
       clickMultiplier,
       achievements,
-      username,
+      username: currentUser?.username || anonymousUsername || '', // Save username from currentUser or anonymousUsername
       gameStats,
       soundEnabled,
       currentTheme,
@@ -607,7 +879,8 @@ export default function SpacebarClickerGame() {
     totalClicks,
     clickMultiplier,
     achievements,
-    username,
+    currentUser, // Dependency changed to currentUser
+    anonymousUsername, // Added anonymousUsername as dependency
     gameStats,
     soundEnabled,
     currentTheme,
@@ -675,7 +948,7 @@ export default function SpacebarClickerGame() {
       window.removeEventListener('keydown', handleKeyPress)
       window.removeEventListener('keyup', handleKeyUp)
     }
-  }, [clickMultiplier])
+  }, [clickMultiplier, playClickSound]) // Added playClickSound to dependencies
 
   // Confetti animation
   useEffect(() => {
@@ -703,6 +976,32 @@ export default function SpacebarClickerGame() {
       }
     }
   }, [confetti.length])
+
+  // Score submission on component unmount or page close
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Submit score for both logged-in and anonymous users if clicks exist
+      if (totalClicks > 0) {
+        console.log('Before unload: Triggering score submission.') // Added log
+        submitGameScore()
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [submitGameScore, totalClicks]) // Removed currentUser from dependencies
+
+  // Score alert timeout
+  useEffect(() => {
+    if (scoreAlert) {
+      const timer = setTimeout(() => {
+        setScoreAlert(null)
+      }, 5000) // Hide after 5 seconds
+      return () => clearTimeout(timer)
+    }
+  }, [scoreAlert])
 
   const updateStats = useCallback(() => {
     const currentTime = Date.now()
@@ -829,6 +1128,9 @@ export default function SpacebarClickerGame() {
     const currentTime = Date.now()
     const clickValue = Math.floor(clickMultiplier)
 
+    // Play click sound
+    playClickSound()
+
     // Update click streak
     if (currentTime - lastClickTime < 500) {
       setClickStreak((prev) => prev + 1)
@@ -902,7 +1204,54 @@ export default function SpacebarClickerGame() {
     )
   }
 
-  async function resetProgress() {
+  const handleLogout = useCallback(async () => {
+    // Submit current score before logging out
+    await submitGameScore()
+
+    try {
+      const response = await api.logout()
+      if (response.success) {
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('user_data')
+        localStorage.removeItem('guest_username') // Clear guest username on logout
+        setCurrentUser(null)
+        setAnonymousUsername(null) // Clear anonymous username state
+        // Reset game state to initial anonymous state after logout
+        resetProgress(false) // Pass false to prevent another score submission
+        router.push('/')
+      } else {
+        console.error('Logout failed:', response.error)
+        // Even if API logout fails, clear local storage for UX
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('user_data')
+        localStorage.removeItem('guest_username') // Clear guest username on logout
+        setCurrentUser(null)
+        setAnonymousUsername(null) // Clear anonymous username state
+        resetProgress(false) // Pass false to prevent another score submission
+        router.push('/')
+      }
+    } catch (error) {
+      console.error('Error during logout:', error)
+      // Clear local storage on network error too
+      localStorage.removeItem('auth_token')
+      localStorage.removeItem('user_data')
+      localStorage.removeItem('guest_username') // Clear guest username on logout
+      setCurrentUser(null)
+      setAnonymousUsername(null) // Clear anonymous username state
+      resetProgress(false) // Pass false to prevent another score submission
+      router.push('/auth/login')
+    }
+  }, [router, submitGameScore])
+
+  async function resetProgress(shouldSubmitScore = true) {
+    // Clear any active score alerts immediately on reset
+    setScoreAlert(null)
+
+    if (shouldSubmitScore && totalClicks > 0) {
+      // Only submit current score before resetting if clicks exist
+      await submitGameScore()
+    }
+
     setTotalClicks(0)
     setClickMultiplier(1)
     setFloatingPoints([])
@@ -928,6 +1277,7 @@ export default function SpacebarClickerGame() {
     startTimeRef.current = Date.now()
     clickCountRef.current = 0
     localStorage.removeItem('spacebar-clicker-data')
+    // Do NOT remove guest_username here, as it should persist across resets for the same guest user
 
     // Properly reinitialize achievements from backend
     try {
@@ -1110,7 +1460,7 @@ export default function SpacebarClickerGame() {
 
   return (
     <div
-      className={`relative min-h-screen w-full transition-all duration-1000 ${currentTheme.bgClass}`}
+      className={`relative min-h-screen w-full transition-all  duration-1000 ${currentTheme.bgClass}`}
     >
       {/* Fixed Dark Grid Background */}
       <div className='fixed inset-0'>
@@ -1136,6 +1486,29 @@ export default function SpacebarClickerGame() {
         ))}
       </div>
 
+      {/* Score Alert */}
+      <AnimatePresence>
+        {scoreAlert && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            transition={{ duration: 0.5 }}
+            className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 p-3 rounded-lg shadow-lg text-white font-semibold text-center
+              ${
+                scoreAlert.type === 'success'
+                  ? 'bg-green-600'
+                  : scoreAlert.type === 'info'
+                  ? 'bg-blue-600'
+                  : 'bg-red-600'
+              }
+            `}
+          >
+            {scoreAlert.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Main Content */}
       <div className='relative z-10 min-h-screen'>
         {/* Header */}
@@ -1157,7 +1530,8 @@ export default function SpacebarClickerGame() {
                     Spacebar Clicker
                   </h1>
                   <p className='text-sm text-slate-400'>
-                    Level {currentLevel} • {username || 'Anonymous'}
+                    Level {currentLevel} •{' '}
+                    {currentUser?.username || anonymousUsername || 'Anonymous'}
                   </p>
                 </div>
               </div>
@@ -1182,7 +1556,7 @@ export default function SpacebarClickerGame() {
                   {unlockedButNotActivated.length} ready
                 </Badge>
 
-                {/* Desktop: Show sound and settings buttons */}
+                {/* Desktop: Show sound and settings/user buttons */}
                 <Button
                   variant='outline'
                   size='icon'
@@ -1203,7 +1577,11 @@ export default function SpacebarClickerGame() {
                       size='icon'
                       className='hidden lg:flex border-slate-600 hover:bg-slate-700 bg-slate-800/50 text-slate-300 hover:text-white'
                     >
-                      <Settings className='h-4 w-4' />
+                      {currentUser ? (
+                        <UserCircle className='h-4 w-4' />
+                      ) : (
+                        <Settings className='h-4 w-4' />
+                      )}
                     </Button>
                   </DialogTrigger>
                   <DialogContent className='bg-slate-900 border-slate-700'>
@@ -1223,14 +1601,37 @@ export default function SpacebarClickerGame() {
                             Username
                           </label>
                           <Input
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            placeholder='Enter your username'
+                            value={
+                              currentUser?.username ||
+                              anonymousUsername ||
+                              'Anonymous'
+                            }
+                            disabled // Username is from backend, not editable here
                             className='bg-slate-800 border-slate-600 text-white'
                           />
                         </div>
+                        {currentUser ? (
+                          <Button
+                            onClick={handleLogout}
+                            variant='outline'
+                            className='w-full border-red-500/50 text-red-400 hover:bg-red-500/10 hover:text-red-300 bg-transparent'
+                          >
+                            <LogOut className='h-4 w-4 mr-2' />
+                            Logout
+                          </Button>
+                        ) : (
+                          <Link href='/auth/login' passHref>
+                            <Button
+                              className='w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white'
+                              onClick={() => setShowSettings(false)}
+                            >
+                              <LogIn className='h-4 w-4 mr-2' />
+                              Login
+                            </Button>
+                          </Link>
+                        )}
                         <Button
-                          onClick={resetProgress}
+                          onClick={() => resetProgress(false)}
                           variant='destructive'
                           className='w-full'
                         >
@@ -1350,9 +1751,12 @@ export default function SpacebarClickerGame() {
                             Username
                           </label>
                           <Input
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            placeholder='Enter your username'
+                            value={
+                              currentUser?.username ||
+                              anonymousUsername ||
+                              'Anonymous'
+                            }
+                            disabled // Username is from backend, not editable here
                             className='bg-slate-800 border-slate-600 text-white'
                           />
                         </div>
@@ -1375,9 +1779,33 @@ export default function SpacebarClickerGame() {
                           </Button>
                         </div>
 
+                        {currentUser ? (
+                          <Button
+                            onClick={() => {
+                              handleLogout()
+                              setShowMobileMenu(false)
+                            }}
+                            variant='outline'
+                            className='w-full border-red-500/50 text-red-400 hover:bg-red-500/10 hover:text-red-300'
+                          >
+                            <LogOut className='h-4 w-4 mr-2' />
+                            Logout
+                          </Button>
+                        ) : (
+                          <Link href='/auth/login' passHref>
+                            <Button
+                              className='w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white'
+                              onClick={() => setShowMobileMenu(false)}
+                            >
+                              <LogIn className='h-4 w-4 mr-2' />
+                              Login
+                            </Button>
+                          </Link>
+                        )}
+
                         <Button
                           onClick={() => {
-                            resetProgress()
+                            resetProgress(false) // Pass false to prevent score submission on manual reset
                             setShowMobileMenu(false)
                           }}
                           variant='destructive'
@@ -1474,7 +1902,6 @@ export default function SpacebarClickerGame() {
                                   <div className='text-xs text-green-400'>
                                     {achievement.speed > 0 &&
                                       `+${achievement.speed}/s • `}
-                                    +
                                     {(
                                       (achievement.clickMultiplier - 1) *
                                       100
@@ -1726,42 +2153,47 @@ export default function SpacebarClickerGame() {
                           </div>
                         </div>
                       ) : leaderboardData.length > 0 ? (
-                        leaderboardData.slice(0, 10).map((entry, index) => (
-                          <motion.div
-                            key={entry.id}
-                            className='flex items-center gap-3 p-3 rounded-lg bg-slate-800/30 border border-slate-600/20 hover:bg-slate-700/30 transition-colors'
-                            whileHover={{ scale: 1.02 }}
-                          >
-                            <div className='flex items-center gap-2 min-w-0'>
-                              {index === 0 && (
-                                <Crown className='h-4 w-4 text-yellow-400 flex-shrink-0' />
-                              )}
-                              <span className='text-sm font-bold text-slate-300 flex-shrink-0'>
-                                #{index + 1}
-                              </span>
-                            </div>
-                            <div className='flex-1 min-w-0'>
-                              <div className='font-medium text-sm text-white truncate flex items-center gap-2'>
-                                {entry.username}
-                                {entry.is_verified && (
-                                  <Badge
-                                    variant='secondary'
-                                    className='bg-green-500/20 text-green-300 border-green-500/30 text-xs px-1 py-0'
-                                  >
-                                    ✓
-                                  </Badge>
+                        leaderboardData.slice(0, 5).map(
+                          (
+                            entry,
+                            index // Changed to slice(0, 5) for top 5
+                          ) => (
+                            <motion.div
+                              key={entry.id}
+                              className='flex items-center gap-3 p-3 rounded-lg bg-slate-800/30 border border-slate-600/20 hover:bg-slate-700/30 transition-colors'
+                              whileHover={{ scale: 1.02 }}
+                            >
+                              <div className='flex items-center gap-2 min-w-0'>
+                                {index === 0 && (
+                                  <Crown className='h-4 w-4 text-yellow-400 flex-shrink-0' />
                                 )}
+                                <span className='text-sm font-bold text-slate-300 flex-shrink-0'>
+                                  #{entry.rank || index + 1}
+                                </span>
                               </div>
-                              <div className='text-xs text-slate-400'>
-                                {formatNumber(entry.total_clicks)} •{' '}
-                                {entry.clicks_per_second}/sec
+                              <div className='flex-1 min-w-0'>
+                                <div className='font-medium text-sm text-white truncate flex items-center gap-2'>
+                                  {entry.username}
+                                  {entry.is_verified && (
+                                    <Badge
+                                      variant='secondary'
+                                      className='bg-green-500/20 text-green-300 border-green-500/30 text-xs px-1 py-0'
+                                    >
+                                      ✓
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className='text-xs text-slate-400'>
+                                  {formatNumber(entry.total_clicks)} •{' '}
+                                  {entry.clicks_per_second}/sec
+                                </div>
                               </div>
-                            </div>
-                            <div className='text-lg flex-shrink-0'>
-                              {entry.flag_emoji}
-                            </div>
-                          </motion.div>
-                        ))
+                              <div className='text-lg flex-shrink-0'>
+                                {entry.flag_emoji}
+                              </div>
+                            </motion.div>
+                          )
+                        )
                       ) : (
                         <div className='text-center py-8'>
                           <Users className='h-12 w-12 mx-auto mb-4 opacity-50' />
@@ -1773,6 +2205,50 @@ export default function SpacebarClickerGame() {
                       )}
                     </div>
                   </ScrollArea>
+                </CardContent>
+              </Card>
+
+              {/* Global High Score */}
+              <Card className='bg-slate-900/40 border-slate-700/50 backdrop-blur-sm'>
+                <CardHeader className='pb-3'>
+                  <CardTitle className='flex items-center gap-2 text-white'>
+                    <Crown className='h-5 w-5 text-yellow-400' />
+                    Global High Score
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className='text-center'>
+                  {highScoreData ? (
+                    <div className='space-y-2'>
+                      <div className='text-4xl font-bold text-yellow-300'>
+                        {formatNumber(highScoreData.high_score)}
+                      </div>
+                      <div className='text-lg text-slate-300 flex items-center justify-center gap-2'>
+                        <span className='font-semibold'>
+                          {highScoreData.holder || 'N/A'}
+                        </span>
+                        {highScoreData.is_verified && (
+                          <Badge
+                            variant='secondary'
+                            className='bg-green-500/20 text-green-300 border-green-500/30 text-xs px-1 py-0'
+                          >
+                            ✓
+                          </Badge>
+                        )}
+                        {highScoreData.flag_emoji && (
+                          <span className='text-xl'>
+                            {highScoreData.flag_emoji}
+                          </span>
+                        )}
+                      </div>
+                      <div className='text-sm text-slate-400'>
+                        Current record holder
+                      </div>
+                    </div>
+                  ) : (
+                    <div className='text-slate-400 py-4'>
+                      Loading high score...
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -1981,42 +2457,47 @@ export default function SpacebarClickerGame() {
                           </div>
                         </div>
                       ) : leaderboardData.length > 0 ? (
-                        leaderboardData.slice(0, 10).map((entry, index) => (
-                          <motion.div
-                            key={entry.id}
-                            className='flex items-center gap-3 p-3 rounded-lg bg-slate-800/30 border border-slate-600/20 hover:bg-slate-700/30 transition-colors'
-                            whileHover={{ scale: 1.02 }}
-                          >
-                            <div className='flex items-center gap-2 min-w-0'>
-                              {index === 0 && (
-                                <Crown className='h-4 w-4 text-yellow-400 flex-shrink-0' />
-                              )}
-                              <span className='text-sm font-bold text-slate-300 flex-shrink-0'>
-                                #{index + 1}
-                              </span>
-                            </div>
-                            <div className='flex-1 min-w-0'>
-                              <div className='font-medium text-sm text-white truncate flex items-center gap-2'>
-                                {entry.username}
-                                {entry.is_verified && (
-                                  <Badge
-                                    variant='secondary'
-                                    className='bg-green-500/20 text-green-300 border-green-500/30 text-xs px-1 py-0'
-                                  >
-                                    ✓
-                                  </Badge>
+                        leaderboardData.slice(0, 5).map(
+                          (
+                            entry,
+                            index // Changed to slice(0, 5) for top 5
+                          ) => (
+                            <motion.div
+                              key={entry.id}
+                              className='flex items-center gap-3 p-3 rounded-lg bg-slate-800/30 border border-slate-600/20 hover:bg-slate-700/30 transition-colors'
+                              whileHover={{ scale: 1.02 }}
+                            >
+                              <div className='flex items-center gap-2 min-w-0'>
+                                {index === 0 && (
+                                  <Crown className='h-4 w-4 text-yellow-400 flex-shrink-0' />
                                 )}
+                                <span className='text-sm font-bold text-slate-300 flex-shrink-0'>
+                                  #{entry.rank || index + 1}
+                                </span>
                               </div>
-                              <div className='text-xs text-slate-400'>
-                                {formatNumber(entry.total_clicks)} •{' '}
-                                {entry.clicks_per_second}/sec
+                              <div className='flex-1 min-w-0'>
+                                <div className='font-medium text-sm text-white truncate flex items-center gap-2'>
+                                  {entry.username}
+                                  {entry.is_verified && (
+                                    <Badge
+                                      variant='secondary'
+                                      className='bg-green-500/20 text-green-300 border-green-500/30 text-xs px-1 py-0'
+                                    >
+                                      ✓
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className='text-xs text-slate-400'>
+                                  {formatNumber(entry.total_clicks)} •{' '}
+                                  {entry.clicks_per_second}/sec
+                                </div>
                               </div>
-                            </div>
-                            <div className='text-lg flex-shrink-0'>
-                              {entry.flag_emoji}
-                            </div>
-                          </motion.div>
-                        ))
+                              <div className='text-lg flex-shrink-0'>
+                                {entry.flag_emoji}
+                              </div>
+                            </motion.div>
+                          )
+                        )
                       ) : (
                         <div className='text-center py-8'>
                           <Users className='h-12 w-12 mx-auto mb-4 opacity-50' />
@@ -2028,6 +2509,354 @@ export default function SpacebarClickerGame() {
                       )}
                     </div>
                   </ScrollArea>
+                </CardContent>
+              </Card>
+
+              {/* Global High Score */}
+              <Card className='bg-slate-900/40 border-slate-700/50 backdrop-blur-sm'>
+                <CardHeader className='pb-3'>
+                  <CardTitle className='flex items-center gap-2 text-white'>
+                    <Crown className='h-5 w-5 text-yellow-400' />
+                    Global High Score
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className='text-center'>
+                  {highScoreData ? (
+                    <div className='space-y-2'>
+                      <div className='text-4xl font-bold text-yellow-300'>
+                        {formatNumber(highScoreData.high_score)}
+                      </div>
+                      <div className='text-lg text-slate-300 flex items-center justify-center gap-2'>
+                        <span className='font-semibold'>
+                          {highScoreData.holder || 'N/A'}
+                        </span>
+                        {highScoreData.is_verified && (
+                          <Badge
+                            variant='secondary'
+                            className='bg-green-500/20 text-green-300 border-green-500/30 text-xs px-1 py-0'
+                          >
+                            ✓
+                          </Badge>
+                        )}
+                        {highScoreData.flag_emoji && (
+                          <span className='text-xl'>
+                            {highScoreData.flag_emoji}
+                          </span>
+                        )}
+                      </div>
+                      <div className='text-sm text-slate-400'>
+                        Current record holder
+                      </div>
+                    </div>
+                  ) : (
+                    <div className='text-slate-400 py-4'>
+                      Loading high score...
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Social Sharing */}
+              <Card className='bg-slate-900/40 border-slate-700/50 backdrop-blur-sm'>
+                <CardHeader className='pb-3'>
+                  <CardTitle className='flex items-center gap-2 text-white'>
+                    <Share2 className='h-5 w-5 text-green-400' />
+                    Share Your Score
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className='space-y-3'>
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Button
+                      onClick={() => shareToSocial('twitter')}
+                      className='w-full bg-blue-500 hover:bg-blue-600 text-white'
+                    >
+                      Share on Twitter
+                    </Button>
+                  </motion.div>
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Button
+                      onClick={() => shareToSocial('facebook')}
+                      className='w-full bg-blue-600 hover:bg-blue-700 text-white'
+                    >
+                      Share on Facebook
+                    </Button>
+                  </motion.div>
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Button
+                      onClick={() => shareToSocial('whatsapp')}
+                      className='w-full bg-green-600 hover:bg-green-700 text-white'
+                    >
+                      Share on WhatsApp
+                    </Button>
+                  </motion.div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Mobile: Single Column Layout */}
+          <div className='lg:hidden space-y-6'>
+            {/* Main Clicker */}
+            <Card className='bg-slate-900/40 border-slate-700/50 backdrop-blur-sm'>
+              <CardContent className='p-0'>
+                <div
+                  ref={gameAreaRef}
+                  className='relative flex flex-col items-center justify-center cursor-pointer select-none group min-h-[500px] sm:min-h-[600px] py-8'
+                  onClick={handleClick}
+                >
+                  {/* Click Streak Indicator */}
+                  {clickStreak > 3 && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.5 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className='absolute top-8 left-1/2 transform -translate-x-1/2 z-10'
+                    >
+                      <Badge className='bg-orange-500/20 text-orange-300 border-orange-500/30'>
+                        <Flame className='h-3 w-3 mr-1' />
+                        {clickStreak}x Streak!
+                      </Badge>
+                    </motion.div>
+                  )}
+
+                  {/* Main Counter - Fixed Width Container */}
+                  <motion.div
+                    key={Math.floor(totalClicks / 1000)}
+                    initial={{ scale: 1 }}
+                    animate={{ scale: [1, 1.05, 1] }}
+                    transition={{ duration: 0.1 }}
+                    className='text-center mb-8'
+                  >
+                    <div className='relative'>
+                      <div className='min-w-[280px] sm:min-w-[400px] lg:min-w-[500px] mx-auto'>
+                        <div
+                          className={`text-4xl sm:text-6xl lg:text-8xl font-bold bg-gradient-to-r ${currentTheme.primary} bg-clip-text text-transparent mb-4 group-hover:from-purple-400 group-hover:via-pink-400 group-hover:to-blue-400 transition-all duration-300 font-mono`}
+                        >
+                          {formatNumber(totalClicks)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className='text-lg text-slate-400'>Total Clicks</div>
+                  </motion.div>
+
+                  {/* Stats Row */}
+                  <div className='flex flex-wrap justify-center gap-4 mb-8'>
+                    <div className='text-center bg-slate-800/50 px-4 py-2 rounded-lg border border-slate-600/30'>
+                      <div className='text-xl sm:text-2xl font-semibold text-yellow-400'>
+                        {clickMultiplier.toFixed(1)}x
+                      </div>
+                      <div className='text-xs sm:text-sm text-slate-400'>
+                        Multiplier
+                      </div>
+                    </div>
+                    <div className='text-center bg-slate-800/50 px-4 py-2 rounded-lg border border-slate-600/30'>
+                      <div className='text-xl sm:text-2xl font-semibold text-green-400'>
+                        {gameStats.clicksPerSecond}
+                      </div>
+                      <div className='text-xs sm:text-sm text-slate-400'>
+                        Clicks/sec
+                      </div>
+                    </div>
+                    <div className='text-center bg-slate-800/50 px-4 py-2 rounded-lg border border-slate-600/30'>
+                      <div className='text-xl sm:text-2xl font-semibold text-blue-400'>
+                        {achievements
+                          .filter((a) => a.activated && a.speed > 0)
+                          .reduce((sum, a) => sum + a.speed, 0)
+                          .toFixed(1)}
+                      </div>
+                      <div className='text-xs sm:text-sm text-slate-400'>
+                        Auto/sec
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Spacebar Instruction */}
+                  <motion.div
+                    animate={{ y: [0, -10, 0] }}
+                    transition={{
+                      duration: 2,
+                      repeat: Number.POSITIVE_INFINITY,
+                    }}
+                    className='text-center'
+                  >
+                    <div className='text-lg sm:text-xl font-medium mb-4 text-slate-300'>
+                      Press SPACEBAR or Click!
+                    </div>
+                    <motion.div
+                      className='text-4xl sm:text-6xl mb-4'
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      ⌨️
+                    </motion.div>
+                    <div className='text-sm text-slate-500'>
+                      {clickStreak > 1
+                        ? `${clickStreak}x streak bonus active!`
+                        : 'Click rapidly for streak bonuses!'}
+                    </div>
+                  </motion.div>
+
+                  {/* Floating Points */}
+                  <AnimatePresence>
+                    {floatingPoints.map((point) => (
+                      <motion.div
+                        key={point.id}
+                        initial={{ opacity: 1, y: 0, scale: 1 }}
+                        animate={{
+                          opacity: 0,
+                          y: -150,
+                          scale: point.type === 'bonus' ? 1.5 : 1.2,
+                          x: point.type === 'auto' ? [0, 20, -20, 0] : 0,
+                        }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 2 }}
+                        className={`absolute pointer-events-none text-xl sm:text-2xl font-bold ${
+                          point.type === 'bonus'
+                            ? 'text-orange-400'
+                            : point.type === 'auto'
+                            ? 'text-blue-400'
+                            : 'text-green-400'
+                        }`}
+                        style={{ left: point.x, top: point.y }}
+                      >
+                        +{formatNumber(point.value)}
+                        {point.type === 'bonus' && '🔥'}
+                        {point.type === 'auto' && '⚡'}
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Achievement Section - MOVED BELOW MAIN GAME */}
+            <AchievementSection />
+
+            {/* Leaderboard & Social Section */}
+            <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
+              {/* Leaderboard */}
+              <Card className='bg-slate-900/40 border-slate-700/50 backdrop-blur-sm'>
+                <CardHeader className='pb-3'>
+                  <CardTitle className='flex items-center gap-2 text-white'>
+                    <Users className='h-5 w-5 text-blue-400' />
+                    Global Leaderboard
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className='h-64'>
+                    <div className='space-y-2'>
+                      {leaderboardLoading ? (
+                        <div className='text-center py-8'>
+                          <div className='w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2'></div>
+                          <div className='text-slate-400'>
+                            Loading leaderboard...
+                          </div>
+                        </div>
+                      ) : leaderboardData.length > 0 ? (
+                        leaderboardData.slice(0, 5).map(
+                          (
+                            entry,
+                            index // Changed to slice(0, 5) for top 5
+                          ) => (
+                            <motion.div
+                              key={entry.id}
+                              className='flex items-center gap-3 p-3 rounded-lg bg-slate-800/30 border border-slate-600/20 hover:bg-slate-700/30 transition-colors'
+                              whileHover={{ scale: 1.02 }}
+                            >
+                              <div className='flex items-center gap-2 min-w-0'>
+                                {index === 0 && (
+                                  <Crown className='h-4 w-4 text-yellow-400 flex-shrink-0' />
+                                )}
+                                <span className='text-sm font-bold text-slate-300 flex-shrink-0'>
+                                  #{entry.rank || index + 1}
+                                </span>
+                              </div>
+                              <div className='flex-1 min-w-0'>
+                                <div className='font-medium text-sm text-white truncate flex items-center gap-2'>
+                                  {entry.username}
+                                  {entry.is_verified && (
+                                    <Badge
+                                      variant='secondary'
+                                      className='bg-green-500/20 text-green-300 border-green-500/30 text-xs px-1 py-0'
+                                    >
+                                      ✓
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className='text-xs text-slate-400'>
+                                  {formatNumber(entry.total_clicks)} •{' '}
+                                  {entry.clicks_per_second}/sec
+                                </div>
+                              </div>
+                              <div className='text-lg flex-shrink-0'>
+                                {entry.flag_emoji}
+                              </div>
+                            </motion.div>
+                          )
+                        )
+                      ) : (
+                        <div className='text-center py-8'>
+                          <Users className='h-12 w-12 mx-auto mb-4 opacity-50' />
+                          <p className='text-slate-500'>No players yet!</p>
+                          <p className='text-sm text-slate-400'>
+                            Be the first to click!
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+
+              {/* Global High Score */}
+              <Card className='bg-slate-900/40 border-slate-700/50 backdrop-blur-sm'>
+                <CardHeader className='pb-3'>
+                  <CardTitle className='flex items-center gap-2 text-white'>
+                    <Crown className='h-5 w-5 text-yellow-400' />
+                    Global High Score
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className='text-center'>
+                  {highScoreData ? (
+                    <div className='space-y-2'>
+                      <div className='text-4xl font-bold text-yellow-300'>
+                        {formatNumber(highScoreData.high_score)}
+                      </div>
+                      <div className='text-lg text-slate-300 flex items-center justify-center gap-2'>
+                        <span className='font-semibold'>
+                          {highScoreData.holder || 'N/A'}
+                        </span>
+                        {highScoreData.is_verified && (
+                          <Badge
+                            variant='secondary'
+                            className='bg-green-500/20 text-green-300 border-green-500/30 text-xs px-1 py-0'
+                          >
+                            ✓
+                          </Badge>
+                        )}
+                        {highScoreData.flag_emoji && (
+                          <span className='text-xl'>
+                            {highScoreData.flag_emoji}
+                          </span>
+                        )}
+                      </div>
+                      <div className='text-sm text-slate-400'>
+                        Current record holder
+                      </div>
+                    </div>
+                  ) : (
+                    <div className='text-slate-400 py-4'>
+                      Loading high score...
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -2080,7 +2909,7 @@ export default function SpacebarClickerGame() {
         </div>
 
         {/* Homepage Content Section */}
-        <section className='mt-16 space-y-16 container mx-auto px-4'>
+        <section className='mt-16 space-y-16 container mx-auto px-4 pb-4'>
           {/* Hero Content */}
           <div className='text-center space-y-6'>
             <motion.h2
@@ -2162,6 +2991,9 @@ export default function SpacebarClickerGame() {
             </motion.div>
           </div>
 
+          {/* How it Works Section - New Component */}
+          <HowItWorksSection />
+
           {/* Stats Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -2227,6 +3059,7 @@ export default function SpacebarClickerGame() {
           </motion.div>
         </section>
       </div>
+      <Footer />
 
       {/* Achievement Popup - Shows when unlocked but not activated */}
       <AnimatePresence>
@@ -2320,7 +3153,6 @@ export default function SpacebarClickerGame() {
                   >
                     <Star className='h-4 w-4 sm:h-5 sm:w-5' />
                     Achievement Unlocked!
-                    <Star className='h-4 w-4 sm:h-5 sm:w-5' />
                   </motion.div>
 
                   <motion.div

@@ -2168,49 +2168,6 @@ export default function SpacebarClickerGame() {
                 </CardContent>
               </Card>
 
-              <Card className='bg-slate-900/40 border-slate-700/50 backdrop-blur-sm'>
-                <CardHeader className='pb-3'>
-                  <CardTitle className='flex items-center gap-2 text-white'>
-                    <Crown className='h-5 w-5 text-yellow-400' />
-                    Global High Score
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className='text-center'>
-                  {highScoreData ? (
-                    <div className='space-y-2'>
-                      <div className='text-4xl font-bold text-yellow-300'>
-                        {formatNumber(highScoreData.high_score)}
-                      </div>
-                      <div className='text-lg text-slate-300 flex items-center justify-center gap-2'>
-                        <span className='font-semibold'>
-                          {highScoreData.holder || 'N/A'}
-                        </span>
-                        {highScoreData.is_verified && (
-                          <Badge
-                            variant='secondary'
-                            className='bg-green-500/20 text-green-300 border-green-500/30 text-xs px-1 py-0'
-                          >
-                            ✓
-                          </Badge>
-                        )}
-                        {highScoreData.flag_emoji && (
-                          <span className='text-xl'>
-                            {highScoreData.flag_emoji}
-                          </span>
-                        )}
-                      </div>
-                      <div className='text-sm text-slate-400'>
-                        Current record holder
-                      </div>
-                    </div>
-                  ) : (
-                    <div className='text-slate-400 py-4'>
-                      Loading high score...
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
               {/* Social Sharing */}
               <Card className='bg-slate-900/40 border-slate-700/50 backdrop-blur-sm'>
                 <CardHeader className='pb-3'>
