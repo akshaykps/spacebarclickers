@@ -11,8 +11,8 @@ interface SEOHeadProps {
 }
 
 export function SEOHead({
-  title = 'Spacebar Clicker - Ultimate Clicking Speed Test Game',
-  description = 'Test your clicking speed in the ultimate spacebar clicker game! Unlock 20+ achievements, compete on global leaderboards, and master the art of clicking.',
+  title = 'Spacebar Clicker - Boost Your CPS Speed Test',
+  description = 'Test your clicking speed in the ultimate spacebar clicker game! Unlock 200+ achievements, compete on global leaderboards, and master the art of clicking.',
   keywords = [],
   ogImage = '/og-image.png',
   canonicalUrl,

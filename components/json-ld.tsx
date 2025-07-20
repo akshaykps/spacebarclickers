@@ -6,7 +6,7 @@ export function JsonLd() {
     alternateName: 'Ultimate Spacebar Clicking Game',
     url: 'https://spacebarclickers.com',
     description:
-      'Test your clicking speed in the ultimate spacebar clicker game! Unlock 20+ achievements, compete on global leaderboards, and master the art of clicking.',
+      'Test your clicking speed in the ultimate spacebar clicker game! Unlock 200+ achievements, compete on global leaderboards, and master the art of clicking.',
     inLanguage: 'en-US',
     isAccessibleForFree: true,
     creator: {
@@ -121,8 +121,50 @@ export function JsonLd() {
       {
         '@type': 'ListItem',
         position: 2,
-        name: 'Game',
-        item: 'https://spacebarclickers.com',
+        name: 'FAQ',
+        item: 'https://spacebarclickers.com/frequently-asked-questions',
+      },
+      {
+        '@type': 'ListItem',
+        position: 3,
+        name: 'Help Center',
+        item: 'https://spacebarclickers.com/help',
+      },
+      {
+        '@type': 'ListItem',
+        position: 4,
+        name: 'Pro Tips',
+        item: 'https://spacebarclickers.com/tips',
+      },
+      {
+        '@type': 'ListItem',
+        position: 5,
+        name: 'About',
+        item: 'https://spacebarclickers.com/about',
+      },
+      {
+        '@type': 'ListItem',
+        position: 6,
+        name: 'Contact',
+        item: 'https://spacebarclickers.com/contact',
+      },
+      {
+        '@type': 'ListItem',
+        position: 7,
+        name: 'Privacy Policy',
+        item: 'https://spacebarclickers.com/privacy-policy',
+      },
+      {
+        '@type': 'ListItem',
+        position: 8,
+        name: 'Terms of Service',
+        item: 'https://spacebarclickers.com/terms-of-service',
+      },
+      {
+        '@type': 'ListItem',
+        position: 9,
+        name: 'Cookie Policy',
+        item: 'https://spacebarclickers.com/cookies',
       },
     ],
   }
@@ -131,27 +173,19 @@ export function JsonLd() {
     <>
       <script
         type='application/ld+json'
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(websiteSchema),
-        }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
       />
       <script
         type='application/ld+json'
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(gameSchema),
-        }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(gameSchema) }}
       />
       <script
         type='application/ld+json'
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(organizationSchema),
-        }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
       />
       <script
         type='application/ld+json'
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(breadcrumbSchema),
-        }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
     </>
   )

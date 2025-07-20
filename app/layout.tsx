@@ -11,7 +11,7 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   metadataBase: new URL('https://spacebarclickers.com'),
   title: {
-    default: 'Spacebar Clicker - Ultimate Clicking Speed Test Game',
+    default: 'Spacebar Clicker - Boost Your CPS Speed Test',
     template: '%s | Spacebar Clicker',
   },
   description:
@@ -51,7 +51,7 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: 'https://spacebarclickers.com',
     siteName: 'Spacebar Clicker',
-    title: 'Spacebar Clicker - Ultimate Clicking Speed Test Game',
+    title: 'Spacebar Clicker - Boost Your CPS Speed Test',
     description:
       'Test your clicking speed in the ultimate spacebar clicker game! Unlock 20+ achievements, compete on global leaderboards, and master the art of clicking.',
     images: [
@@ -59,21 +59,21 @@ export const metadata: Metadata = {
         url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'Spacebar Clicker Game - Ultimate Clicking Challenge',
+        alt: 'Spacebar Clicker - Boost Your CPS Speed Test',
         type: 'image/png',
       },
       {
         url: '/og-image-square.png',
         width: 1200,
         height: 1200,
-        alt: 'Spacebar Clicker Game Logo',
+        alt: 'Spacebar Clicker Logo',
         type: 'image/png',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Spacebar Clicker - Ultimate Clicking Speed Test Game',
+    title: 'Spacebar Clicker - Boost Your CPS Speed Test',
     description:
       'Test your clicking speed in the ultimate spacebar clicker game! Unlock 20+ achievements, compete on global leaderboards, and master the art of clicking.',
     images: ['/og-image.png'],
@@ -100,9 +100,6 @@ export const metadata: Metadata = {
     ],
     apple: [
       { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
-    ],
-    other: [
-      { rel: 'mask-icon', url: '/safari-pinned-tab.svg', color: '#5bbad5' },
     ],
   },
   manifest: '/site.webmanifest',

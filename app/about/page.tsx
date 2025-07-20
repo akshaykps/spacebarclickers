@@ -4,7 +4,7 @@ import AboutPage from './about-page'
 export const metadata: Metadata = {
   title: 'About Spacebar Clicker - The Ultimate Clicking Challenge',
   description:
-    'Learn about Spacebar Clicker, the ultimate clicking speed test game. Discover our story, features, and what makes our game the best clicking challenge online. 20+ achievements, global leaderboards, and precision gaming.',
+    'Learn about Spacebar Clicker, the ultimate clicking speed test game. Discover our story, features, and what makes our game the best clicking challenge online. 200+ achievements, global leaderboards, and precision gaming.',
   keywords: [
     'about spacebar clicker',
     'clicking game story',

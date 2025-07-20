@@ -2,9 +2,9 @@ import type { Metadata } from 'next'
 import SpacebarClickerGame from './game-page'
 
 export const metadata: Metadata = {
-  title: 'Spacebar Clicker - Ultimate Clicking Speed Test Game',
+  title: 'Spacebar Clicker - Boost Your CPS Speed Test',
   description:
-    'Test your clicking speed in the ultimate spacebar clicker game! Unlock 20+ achievements, compete on global leaderboards, and master the art of clicking. Free online browser game.',
+    'Test your clicking speed in the ultimate spacebar clicker game! Unlock 200+ achievements, compete on global leaderboards, and master the art of clicking. Free online browser game.',
   keywords: [
     'spacebar clicker',
     'clicking game',
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     'arcade game',
   ],
   openGraph: {
-    title: 'Spacebar Clicker - Ultimate Clicking Speed Test Game',
+    title: 'Spacebar Clicker - Boost Your CPS Speed Test',
     description:
       'Test your clicking speed in the ultimate spacebar clicker game! Unlock 20+ achievements, compete on global leaderboards, and master the art of clicking.',
     url: 'https://spacebarclickers.com',
@@ -38,13 +38,13 @@ export const metadata: Metadata = {
         url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'Spacebar Clicker Game - Ultimate Clicking Challenge',
+        alt: 'Spacebar Clicker - Boost Your CPS Speed Test',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Spacebar Clicker - Ultimate Clicking Speed Test Game',
+    title: 'Spacebar Clicker - Boost Your CPS Speed Test',
     description:
       'Test your clicking speed in the ultimate spacebar clicker game! Unlock 20+ achievements, compete on global leaderboards, and master the art of clicking.',
     images: ['/og-image.png'],
@@ -110,7 +110,7 @@ const gameStructuredData = {
     {
       '@type': 'Thing',
       name: 'Achievements',
-      description: '20+ unlockable achievements with unique rewards',
+      description: '200+ unlockable achievements with unique rewards',
     },
     {
       '@type': 'Thing',
