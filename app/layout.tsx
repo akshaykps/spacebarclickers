@@ -118,11 +118,10 @@ export const metadata: Metadata = {
     userScalable: true,
   },
   verification: {
-    google: 'your-google-verification-code',
-    yandex: 'your-yandex-verification-code',
-    yahoo: 'your-yahoo-verification-code',
+    google: 'lmGhwrmhar_P6fggj6oqAMF9gv4dJ-8pI-phFfSw-Ic',
+    yandex: 'c74d44d975ef075a',
     other: {
-      'msvalidate.01': 'your-bing-verification-code',
+      'msvalidate.01': '4F68C947429D9DA6FA87A6B24C0D5B18',
     },
   },
   alternates: {
