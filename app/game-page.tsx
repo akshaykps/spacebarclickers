@@ -14,7 +14,6 @@ import {
   Flame,
   Volume2,
   VolumeX,
-  Star,
   Menu,
   Info,
   Mail,
@@ -107,16 +106,6 @@ interface GameStats {
   achievementsUnlocked: number
   achievementsActivated: number
   highestClicksPerSecond: number
-}
-
-interface LeaderboardEntry {
-  username: string
-  totalClicks: number
-  level: number
-  country: string
-  flag: string
-  clicksPerSecond: number
-  isVerified?: boolean
 }
 
 export const predefinedAchievements: Omit<
@@ -519,6 +508,7 @@ export default function SpacebarClickerGame() {
     BackendLeaderboardEntry[]
   >([])
   const [leaderboardLoading, setLeaderboardLoading] = useState(true)
+  const highScoreData = leaderboardData.length > 0 ? leaderboardData[0] : null
   const [userCountryInfo, setUserCountryInfo] = useState({
     country: 'Unknown',
     country_code: 'XX',
@@ -646,8 +636,8 @@ export default function SpacebarClickerGame() {
               totalClicks: userScore.total_clicks,
               clicksPerSecond: userScore.clicks_per_second,
               timePlayedSeconds: userScore.time_played_seconds,
-              achievementsUnlocked: userScore.achievements_unlocked,
-              achievementsActivated: userScore.achievements_activated,
+              achievementsUnlocked: userScore.achievementsUnlocked,
+              achievementsActivated: userScore.achievementsActivated,
             }))
 
             // Re-apply activated achievement effects based on fetched data
@@ -705,7 +695,7 @@ export default function SpacebarClickerGame() {
     }
 
     initializeGame()
-    fetchLeaderboard() // Initial fetch of leaderboard
+    fetchLeaderboard() // Initial fetch of leaderboard only
 
     return () => {
       if (statsIntervalRef.current) {
@@ -715,11 +705,13 @@ export default function SpacebarClickerGame() {
         clearTimeout(scoreSubmitDebounceRef.current)
       }
     }
-  }, [fetchLeaderboard]) // Added fetchLeaderboard to dependencies
+  }, [fetchLeaderboard]) // Only fetchLeaderboard dependency
 
-  // Periodic leaderboard refresh (every 30 seconds)
+  // Periodic leaderboard and high score refresh (every 30 seconds)
   useEffect(() => {
-    const interval = setInterval(fetchLeaderboard, 30000)
+    const interval = setInterval(() => {
+      fetchLeaderboard() // Only refresh leaderboard
+    }, 30000)
     return () => clearInterval(interval)
   }, [fetchLeaderboard])
 
@@ -889,7 +881,7 @@ export default function SpacebarClickerGame() {
       achievements_activated: gameStats.achievementsActivated,
       time_played_seconds: gameStats.timePlayedSeconds,
       country: userCountryInfo.country,
-      country_code: userCountryInfo.country_code,
+      country_code: userCountryInfo.flag_code,
       flag_emoji: userCountryInfo.flag_emoji,
       // Add the new fields for backend submission
       achievements_unlocked_ids,
@@ -1278,6 +1270,9 @@ export default function SpacebarClickerGame() {
 
   // Format number
   function formatNumber(num: number): string {
+    if (num == null) {
+      return '0' // Or any other default value you prefer
+    }
     if (num >= 1e12) return (num / 1e12).toFixed(1) + 'T'
     if (num >= 1e9) return (num / 1e9).toFixed(1) + 'B'
     if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M'
@@ -1859,7 +1854,10 @@ export default function SpacebarClickerGame() {
                                   <div className='font-medium text-white text-sm'>
                                     {achievement.name}
                                   </div>
-                                  <div className='text-xs text-green-400'>
+                                  <div className='text-xs text-slate-300'>
+                                    {achievement.description}
+                                  </div>
+                                  <div className='text-xs text-green-400 mt-1'>
                                     {achievement.speed > 0 &&
                                       `+${achievement.speed}/s • `}
                                     {(
@@ -2179,11 +2177,11 @@ export default function SpacebarClickerGame() {
                   {highScoreData ? (
                     <div className='space-y-2'>
                       <div className='text-4xl font-bold text-yellow-300'>
-                        {formatNumber(highScoreData.high_score)}
+                        {formatNumber(highScoreData.total_clicks)}
                       </div>
                       <div className='text-lg text-slate-300 flex items-center justify-center gap-2'>
                         <span className='font-semibold'>
-                          {highScoreData.holder || 'N/A'}
+                          {highScoreData.username || 'Anonymous'}
                         </span>
                         {highScoreData.is_verified && (
                           <Badge
@@ -2205,6 +2203,7 @@ export default function SpacebarClickerGame() {
                     </div>
                   ) : (
                     <div className='text-slate-400 py-4'>
+                      <div className='w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin mx-auto mb-2'></div>
                       Loading high score...
                     </div>
                   )}
@@ -2393,7 +2392,7 @@ export default function SpacebarClickerGame() {
             </Card>
 
             {/* Achievement Section - MOVED BELOW MAIN GAME */}
-            <AchievementSection />
+            {<AchievementSection />}
 
             {/* Leaderboard & Social Section */}
             <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
@@ -2589,248 +2588,47 @@ export default function SpacebarClickerGame() {
             >
               <Card className='bg-slate-900/40 border-slate-700/50 backdrop-blur-sm h-full'>
                 <CardContent className='p-6 text-center'>
-                  <Zap className='h-12 w-12 text-purple-400 mx-auto mb-4' />
+                  <Zap className='h-12 w-12 text-green-400 mx-auto mb-4' />
                   <h3 className='text-xl font-semibold text-white mb-2'>
-                    Auto-Clickers
+                    Endless Fun
                   </h3>
                   <p className='text-slate-400'>
-                    Activate achievements to unlock powerful auto-clicking
-                    systems
+                    Enjoy hours of addictive gameplay with satisfying click
+                    mechanics
                   </p>
                 </CardContent>
               </Card>
             </motion.div>
           </div>
 
-          {/* How it Works Section - New Component */}
+          {/* How It Works Section */}
           <HowItWorksSection />
-
-          {/* Stats Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.5 }}
-            className='text-center'
-          >
-            <h3 className='text-2xl font-bold text-white mb-8'>
-              Join the Community
-            </h3>
-            <div className='grid grid-cols-2 md:grid-cols-4 gap-6'>
-              <div>
-                <div className='text-3xl font-bold text-blue-400'>
-                  {formatNumber(gameStats.totalClicks || 1000000)}+
-                </div>
-                <div className='text-slate-400'>Total Clicks</div>
-              </div>
-              <div>
-                <div className='text-3xl font-bold text-green-400'>500+</div>
-                <div className='text-slate-400'>Active Players</div>
-              </div>
-              <div>
-                <div className='text-3xl font-bold text-yellow-400'>20+</div>
-                <div className='text-slate-400'>Achievements</div>
-              </div>
-              <div>
-                <div className='text-3xl font-bold text-purple-400'>50+</div>
-                <div className='text-slate-400'>Countries</div>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Call to Action */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.6 }}
-            className='text-center space-y-6'
-          >
-            <h3 className='text-2xl font-bold text-white'>
-              Ready to Start Clicking?
-            </h3>
-            <div className='flex flex-col sm:flex-row gap-4 justify-center'>
-              <Button
-                size='lg'
-                className='bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white'
-                onClick={() =>
-                  gameAreaRef.current?.scrollIntoView({ behavior: 'smooth' })
-                }
-              >
-                <Target className='h-5 w-5 mr-2' />
-                Start Playing Now
-              </Button>
-              <Button
-                size='lg'
-                variant='outline'
-                className='border-slate-600 hover:bg-slate-700 bg-slate-800/50'
-              >
-                <Users className='h-5 w-5 mr-2' />
-                View Leaderboard
-              </Button>
-            </div>
-          </motion.div>
         </section>
       </div>
+
+      {/* Footer */}
       <Footer />
 
-      {/* Achievement Popup - Shows when unlocked but not activated */}
+      {/* New Achievement Toast */}
       <AnimatePresence>
         {newAchievement && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.3, rotate: -180 }}
-            animate={{
-              opacity: 1,
-              scale: 1,
-              rotate: 0,
-              y: [0, -20, 0],
-            }}
-            exit={{
-              opacity: 0,
-              scale: 0.3,
-              rotate: Math.random() > 0.5 ? 360 : -360,
-              x: (Math.random() - 0.5) * 400,
-              y: -200,
-            }}
-            transition={{
-              duration: 0.6,
-              exit: { duration: 0.8 },
-            }}
-            className='fixed inset-0 flex items-center justify-center z-50 pointer-events-none p-4'
+            key={newAchievement.id}
+            initial={{ opacity: 0, y: 50, scale: 0.8 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.8 }}
+            transition={{ duration: 0.3 }}
+            className='fixed bottom-4 left-4 z-50 bg-slate-900/80 border border-slate-700/50 backdrop-blur-sm rounded-lg shadow-lg p-4 flex items-center gap-3'
           >
-            <motion.div
-              className={`bg-gradient-to-r ${
-                rarityColors[newAchievement.rarity]
-              } p-1 rounded-xl shadow-2xl w-full max-w-xs sm:max-w-sm`}
-              animate={{
-                boxShadow: [
-                  '0 0 20px rgba(168, 85, 247, 0.4)',
-                  '0 0 60px rgba(168, 85, 247, 0.8)',
-                  '0 0 20px rgba(168, 85, 247, 0.4)',
-                ],
-                scale: [1, 1.05, 1],
-              }}
-              transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
-            >
-              <div className='bg-slate-900/80 backdrop-blur-md p-4 sm:p-6 rounded-lg relative overflow-hidden'>
-                {/* Animated background sparkles */}
-                <div className='absolute inset-0'>
-                  {[...Array(10)].map((_, i) => (
-                    <motion.div
-                      key={i}
-                      className='absolute w-1 h-1 bg-yellow-400 rounded-full'
-                      style={{
-                        left: `${Math.random() * 100}%`,
-                        top: `${Math.random() * 100}%`,
-                      }}
-                      animate={{
-                        opacity: [0, 1, 0],
-                        scale: [0, 1.5, 0],
-                        rotate: [0, 180, 360],
-                      }}
-                      transition={{
-                        duration: 2,
-                        repeat: Number.POSITIVE_INFINITY,
-                        delay: i * 0.1,
-                      }}
-                    />
-                  ))}
-                </div>
-
-                <div className='text-center relative z-10'>
-                  <motion.div
-                    className='text-3xl sm:text-4xl mb-3'
-                    animate={{
-                      rotate: [0, 15, -15, 0],
-                      scale: [1, 1.3, 1],
-                    }}
-                    transition={{ duration: 0.6, repeat: 4 }}
-                  >
-                    {newAchievement.icon}
-                  </motion.div>
-
-                  <motion.div
-                    className='text-lg sm:text-xl font-bold text-yellow-300 mb-2 flex items-center justify-center gap-2'
-                    animate={{
-                      scale: [1, 1.1, 1],
-                      textShadow: [
-                        '0 0 10px rgba(255, 255, 0, 0.5)',
-                        '0 0 20px rgba(255, 255, 0, 0.8)',
-                        '0 0 10px rgba(255, 255, 0, 0.5)',
-                      ],
-                    }}
-                    transition={{
-                      duration: 1.5,
-                      repeat: Number.POSITIVE_INFINITY,
-                    }}
-                  >
-                    <Star className='h-4 w-4 sm:h-5 sm:w-5' />
-                    Achievement Unlocked!
-                    <Star className='h-4 w-4 sm:h-5 sm:w-5' />
-                  </motion.div>
-
-                  <motion.div
-                    className='text-base sm:text-lg font-semibold mb-2 text-white'
-                    animate={{ opacity: [0.8, 1, 0.8] }}
-                    transition={{
-                      duration: 1,
-                      repeat: Number.POSITIVE_INFINITY,
-                    }}
-                  >
-                    {newAchievement.name}
-                  </motion.div>
-
-                  <div className='text-xs sm:text-sm text-slate-300 mb-3'>
-                    {newAchievement.description}
-                  </div>
-
-                  <div className='space-y-1 mb-4'>
-                    <motion.div
-                      className='text-xs sm:text-sm text-orange-400 font-medium'
-                      animate={{
-                        opacity: [0.7, 1, 0.7],
-                        scale: [1, 1.05, 1],
-                      }}
-                      transition={{
-                        duration: 1.5,
-                        repeat: Number.POSITIVE_INFINITY,
-                      }}
-                    >
-                      🎉 Ready to activate for bonuses!
-                    </motion.div>
-
-                    <div className='text-xs sm:text-sm text-green-400 flex items-center justify-center gap-1 font-medium'>
-                      Multiplier +
-                      {((newAchievement.clickMultiplier - 1) * 100).toFixed(0)}%
-                      {newAchievement.speed > 0 && (
-                        <>
-                          {' • '}
-                          <Zap className='h-3 w-3' />
-                          Auto: {newAchievement.speed}/sec
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  <motion.div
-                    animate={{
-                      scale: [1, 1.1, 1],
-                      rotate: [0, 5, -5, 0],
-                    }}
-                    transition={{
-                      duration: 2,
-                      repeat: Number.POSITIVE_INFINITY,
-                    }}
-                  >
-                    <Badge
-                      className={`bg-gradient-to-r ${
-                        rarityColors[newAchievement.rarity]
-                      } text-white border-0 font-bold px-2 py-1 text-xs sm:text-sm`}
-                    >
-                      {newAchievement.rarity.toUpperCase()}
-                    </Badge>
-                  </motion.div>
-                </div>
+            <div className='text-3xl'>{newAchievement.icon}</div>
+            <div>
+              <div className='font-medium text-white'>
+                Achievement Unlocked!
               </div>
-            </motion.div>
+              <div className='text-sm text-slate-400'>
+                {newAchievement.name} - {newAchievement.description}
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -1,0 +1,96 @@
+{
+  "name": "Spacebar Clicker - Ultimate Clicking Game",
+  "short_name": "Spacebar Clicker",
+  "description": "Test your clicking speed in the ultimate spacebar clicker game! Unlock achievements and compete globally.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en-US",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon-16x16.png",
+      "sizes": "16x16",
+      "type": "image/png"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Spacebar Clicker Game Interface"
+    },
+    {
+      "src": "/screenshot-narrow.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Mobile Spacebar Clicker"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Play Game",
+      "short_name": "Play",
+      "description": "Start playing Spacebar Clicker",
+      "url": "/",
+      "icons": [
+        {
+          "src": "/shortcut-play.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Leaderboard",
+      "short_name": "Rankings",
+      "description": "View global leaderboard",
+      "url": "/leaderboard",
+      "icons": [
+        {
+          "src": "/shortcut-leaderboard.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Achievements",
+      "short_name": "Achievements",
+      "description": "View all achievements",
+      "url": "/achievements",
+      "icons": [
+        {
+          "src": "/shortcut-achievements.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ]
+}

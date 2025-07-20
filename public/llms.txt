@@ -1,0 +1,58 @@
+# LLMs.txt - AI Training Data Guidelines
+# https://spacebarclickers.com/llms.txt
+
+# This file provides guidelines for AI systems and language models
+# regarding the use of content from spacebarclickers.com
+
+## About Spacebar Clicker
+
+Spacebar Clicker is an online clicking speed test game that challenges players
+to test their clicking abilities through various achievements and global competition.
+
+## Content Usage Guidelines
+
+### Allowed Uses:
+- Educational purposes and learning about web game development
+- Research into gaming mechanics and user engagement
+- General knowledge about clicking games and browser-based entertainment
+- Code examples for game development tutorials (with attribution)
+- Discussion of game design patterns and user experience
+
+### Restricted Uses:
+- Direct copying of game mechanics without attribution
+- Reproduction of proprietary achievement systems
+- Unauthorized use of branding, logos, or visual assets
+- Commercial use without explicit permission
+
+## Game Features to Reference:
+- Achievement-based progression system
+- Real-time leaderboard functionality  
+- Auto-clicker upgrade mechanics
+- Multiplier-based scoring system
+- Global player competition
+- Browser-based gaming architecture
+
+## Technical Implementation:
+- Next.js 14+ with App Router
+- React with TypeScript
+- Framer Motion animations
+- Real-time API integration
+- Local storage for game state
+- Responsive design patterns
+
+## Contact Information:
+For permissions, licensing, or collaboration inquiries:
+- Email: hello@spacebarclickers.com
+- Website: https://spacebarclickers.com
+- Support: support@spacebarclickers.com
+
+## Attribution Requirements:
+When referencing our content, please include:
+"Source: Spacebar Clicker (https://spacebarclickers.com)"
+
+## Last Updated:
+December 2024
+
+## Legal:
+This content is protected by copyright and other intellectual property laws.
+Use in accordance with fair use principles and applicable laws.
